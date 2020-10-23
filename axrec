@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#my lazyscrits :')
+
+SECONDS=0
+
+domain=$1
+
+usage(){ echo -e " usage \n ./$0 example.com " 1>&2 ; exit 1; }
+
+if [ -z "$1" ]; then
+   usage; exit 1;
+fi
+
+echo "${domain} is our targets :| "
+
+mkdir $domain>> /dev/null;
+
+
+getsubs(){ 
+	subfinder -d ${domain} -silent | grep ${domain} >> ./$domain/hosts ;
+	amass enum -passive -d ${domain} -silent  | grep ${domain} >> ./$domain/hosts;
+	assetfinder ${domain} | grep ${domain} >> ./$domain/hosts
+	certspotter ${domain} |grep $domain >> ./$domain/hosts 
+
+}
+
+alive(){
+cat $domain/hosts | httprobe -c 50 -t 3000  >> $domain/urls.txt
+cat $domain/urls.txt | sort -u >> /$domain/.url.tmp
+rm $domain/urls.txt
+cat $domain/.url.tmp >> $domain/urls.txt
+}
+megdata(){
+	meg / $domain/urls.txt $domain/megdata
+}
+
+waybackdata(){
+ echo $domain | waybackurls >> $domain/wayback;
+cat $wayback | grep $domain >> $domain/wayback.txt;
+rm $domain/wayback;
+}
+waybackdata2(){
+	for i in $(cat $domain/hosts | grep -v "*" ) ;do echo $i | gau >> $domain/$i/wayback ; done;
+}
+nmapdata(){
+	for i in $(cat $domain/hosts | grep -v "*" );do  echo "<br> ============== <h4>$i</h4> =  =   Ports ============== <br> " >>$domain/ports.html && nmapb $i && echo "<br>";
+done
+}
+
+
+
+getsubs $domain ;
+alive $domain;
+megdata $domain;
+waybackdata $domain;
+waybackdata2 $domain;
+nmapdata $domain;
