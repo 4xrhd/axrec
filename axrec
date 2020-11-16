@@ -15,24 +15,33 @@ fi
 echo "${domain} is our targets :| "
 
 mkdir $domain>> /dev/null;
+mkdir $domain/smuggler/; 
+mkdir $domain/megdata/;
+mkdir $domain/payload;
+mkdir $domain/witness/;
 
 
+
+certspotter(){
+		curl -s https://certspotter.com/api/v0/certs\?domain\=$domain | jq '.[].dns_names[]' | sed 's/\"//g' | sed 's/\*\.//g' | sort -u | grep $domain
+	}
 getsubs(){ 
 	subfinder -d ${domain} -silent | grep ${domain} >> ./$domain/hosts ;
 	amass enum -passive -d ${domain} -silent  | grep ${domain} >> ./$domain/hosts;
-	assetfinder ${domain} | grep ${domain} >> ./$domain/hosts
-	certspotter ${domain} |grep $domain >> ./$domain/hosts 
+	assetfinder ${domain} | grep $domain >> ./$domain/hosts
+	certspotter ${domain} |grep $domain >> ./$domain/hosts
+cat ./$domain/hosts | sort -u | grep -v "*" | grep -v 'www.*' >> ./$domain/all.txt
 
 }
 
 alive(){
-cat $domain/hosts | httprobe -c 50 -t 3000  >> $domain/urls.txt
-cat $domain/urls.txt | sort -u >> /$domain/.url.tmp
+cat $domain/hosts | httprobe  >>  ./$domain/urls.txt
+cat $domain/urls.txt | sort -u >> ./$domain/.url.tmp
 rm $domain/urls.txt
-cat $domain/.url.tmp >> $domain/urls.txt
+cat $domain/.url.tmp >> ./$domain/urls.txt
 }
 megdata(){
-	meg / $domain/urls.txt $domain/megdata
+	meg / $domain/urls.txt $domain/megdata/
 }
 
 waybackdata(){
@@ -41,14 +50,40 @@ cat $wayback | grep $domain >> $domain/wayback.txt;
 rm $domain/wayback;
 }
 waybackdata2(){
-	for i in $(cat $domain/hosts | grep -v "*" ) ;do echo $i | gau >> $domain/$i/wayback ; done;
+	for i in $(cat $domain/all.txt | grep -v "*" ) ;do echo $i | gau >> $domain/megdata/$i.wayback ; done;
 }
 nmapdata(){
-	for i in $(cat $domain/hosts | grep -v "*" );do  echo "<br> ============== <h4>$i</h4> =  =   Ports ============== <br> " >>$domain/ports.html && nmapb $i && echo "<br>";
+	for i in $(cat $domain/all.txt | grep -v "*" );do  echo "<br> ============== <h4>$i</h4> =  =   Ports ============== <br> " >>$domain/ports.html && nmapb $i && echo "<br>";
 done
 }
 
+witness(){
+	for I in $(ls $domain/witness/); do 
+      echo "<a href='$I'>$I</a> <br> <img src='$I'> <br> " >> ss.html;
+done
+}
+smuggler(){
+	for i in $(cat ./$domain/urls.txt); do python3 /home/fallaga/tools/smuggler/smuggler.py -u $i -l $domain/smuggler/$i.log && echo " <a href="$i"> $i </a> <br> " >> smugler.html ;done
+}
 
+dalfox(){ 
+	dalfox file ./$domain/params.txt --custom-payload $xsspayload -o ./$domain/payload/xss
+}
+eye(){
+	eyewitness --web -f $domain/urls.txt -d ./$domain/witness
+}
+
+paramspider(){
+		python3 /home/tools/ParamSpider/paramspider.py -d $domain -o  params.txt
+	}
+masreport(){
+	echo "<h1 color=red> Report by AxRec " >> $domain/report.html;
+echo "<a href='/' > gett dir </a>" >> $domain/report.html;
+echo "<br> <a href="smuggler/">smugler payload </a> " >> $domain/report.html;
+echo "<a href="witness/ss.html" color="green"> Screenshots </a> <br>" > ./$domain/report.html
+echo "<iframe href='/urls.txt' >  Urls </iframe>" > ./$domain/report.html
+echo '<br><h3>payload xss </h3> <br> <a href="/payload/xss"> payload </a> ' >> $domain/report.html
+}
 
 getsubs $domain ;
 alive $domain;
@@ -56,3 +91,9 @@ megdata $domain;
 waybackdata $domain;
 waybackdata2 $domain;
 nmapdata $domain;
+smuggler $domain;
+eye;
+dalfox;
+witness;
+masreport;
+
