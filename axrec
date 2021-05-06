@@ -6,7 +6,7 @@ SECONDS=0
 
 domain=$1
 
-usage(){ echo -e " usage \n ./$0 example.com " 1>&2 ; exit 1; }
+usage(){ echo -e " usage \n ./$0 domain.tdl " 1>&2 ; exit 1; }
 
 if [ -z "$1" ]; then
    usage; exit 1;
@@ -29,81 +29,111 @@ getsubs(){
 
 
 	#curl -s "https://rapiddns.io/subdomain/$domain?full=1#result" | grep "<td><a" | cut -d '"' -f 2 | grep http | cut -d '/' -f3 | sed 's/#results//g' | sort -u
-	curl -s https://dns.bufferover.run/dns?q=$domain|cut -d',' -f2|cut -d'"' -f1|sort -u| grep $domain|anew host
-	curl -s "https://riddler.io/search/exportcsv?q=pld:${domain}" | grep -Po "(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u| grep $domain |anew host
-	#curl -s "https://www.virustotal.com/ui/domains/${doamin}/subdomains?limit=1000" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u| anew host
-	#curl -s "https://jldc.me/anubis/subdomains/${doamin}" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u|anew host
-	#curl -s 'http://web.archive.org/cdx/search/cdx?url=*.${domain}/*&output=text&fl=original&collapse=urlkey' | sed -e 's_https*://__' -e "s/\/.*//" | sort -u| grep $doamin |anew host
+	curl -s https://dns.bufferover.run/dns?q=$domain|cut -d',' -f2|cut -d'"' -f1|sort -u| grep $domain|anew $domain/host
+	curl -s "https://riddler.io/search/exportcsv?q=pld:${domain}" | grep -Po "(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u| grep $domain |anew $domain/host
+	#curl -s "https://www.virustotal.com/ui/domains/${doamin}/subdomains?limit=1000" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u| anew $domain/host
+	#curl -s "https://jldc.me/anubis/subdomains/${doamin}" | grep -Po "((http|https):\/\/)?(([\w.-]*)\.([\w]*)\.([A-z]))\w+" | sort -u|anew $domain/host
+	#curl -s 'http://web.archive.org/cdx/search/cdx?url=*.${domain}/*&output=text&fl=original&collapse=urlkey' | sed -e 's_https*://__' -e "s/\/.*//" | sort -u| grep $doamin |anew $domain/host
 	subfinder -d ${domain} -silent | grep ${domain} |anew ./$domain/host ;
 	amass enum -passive -d ${domain} -silent  | grep ${domain} |anew ./$domain/host;
 	assetfinder ${domain} | grep $domain |anew ./$domain/host
 	certspotter ${domain} |grep $domain |anew ./$domain/host
 	#merge all
-	cat ./$domain/host | grep -v "*" | grep -v 'www.*'|grep $domain | anew ./$domain/all.txt
+	cat ./$domain/host | grep -v "*" | grep -v 'www.*'|grep $domain |sort -fu| anew ./$domain/all.txt
 	
 }
 
 alive(){
-cat $domain/hosts | httprobe| anew ./$domain/urls.txt
-}
-megdata(){
-	meg / $domain/urls.txt $domain/megdata/
+cat $domain/all.txt | httprobe| anew ./$domain/urls.txt
 }
 
+megdata(){
+	meg -v / $domain/urls.txt $domain/megdata/
+}
+gfres(){
+	mkdir ./$domain/gf-data/ ;
+	$old-dir=$(pwd)
+	cd ./$domain/megdata/
+	for gfs in $(gf -list); do gf $gfs | tee -a $old-dir/$domain/gf-data/$gfs.txt ;done
+	sleep 1;
+	cd $old-dir;
+}
+
+favfreak(){
+	mkdir $domain/favfreak;
+	cat ./$domain/urls.txt | favfreak.py -o $domain/favfreak/ --shodan |tee -a $domain/favfreak/all-res.txt
+
+}
+
+
 waybackdata(){
- echo $domain | waybackurls >> $domain/wayback;
-cat $wayback | grep $domain >> $domain/wayback.txt;
+ echo $domain | waybackurls |tee -a $domain/wayback;
+cat $wayback | grep $domain|sort -fu |tee -a $domain/wayback.txt;
 rm $domain/wayback;
 }
 waybackdata2(){
-	for i in $(cat $domain/all.txt | grep -v "*" ) ;do echo $i | gau >> $domain/megdata/$i.wayback ; done;
+	for all in $(cat $domain/all.txt | grep -v "*" ) ;do echo $all | gau >> $domain/megdata/$all.wayback ; done;
 }
 nmapdata(){
-	cat all.txt | filter-resolved | cf-check | sort -u |  naabu -rate 40000 -silent -verify | anew ports.html
+	cat $domain/all.txt | filter-resolved | cf-check | sort -u |  naabu -rate 40000 -silent -verify | tee -a ports.html
 }
 
-witness(){
-	for I in $(ls $domain/witness/); do 
-      echo "<a href='$I'>$I</a> <br> <img src='$I'> <br> " >> ss.html;
-done
-}
 smuggler(){
-	for i in $(cat ./$domain/urls.txt); do python3 ~/Desktop/tools/smuggler/smuggler.py -u $i -l $domain/smuggler/$i.log && echo " <a href="$i"> $i </a> <br> " >> smugler.html ;done
+	for urlsm in $(cat ./$domain/urls.txt); do python3 ~/Desktop/tools/smuggler/smuggler.py -u $urlsm -l $domain/smuggler/$urlsm.log && echo " <a href="$urlsm"> $i </a> <br> " >> smugler.html ;done
 }
 
 # dalfox(){ 
 # 	dalfox file ./$domain/params.txt --custom-payload $xsspayload -o ./$domain/payload/xss
 # }
 eye(){
-	eyewitness --web -f $domain/urls.txt -d ./$domain/witness
+	eyewitness --web -f $domain/urls.txt -d ./$domain/witness/
+}
+witness(){
+	for I in $(ls $domain/witness/); do 
+      echo "<a href='$domain/witness/$I'>$I</a> <br> <img src='./$domain/witness/$I'> <br> " >> ss.html;
+done
 }
 
+
 paramspider(){
-		python3 ~/Desktop/tools/ParamSpider/paramspider.py -d $domain -o params.txt
+		python3 ~/Desktop/tools/ParamSpider/paramspider.py -d $domain -o ./$domain/params.txt
 	}
 	takeover(){
-		subjack -w domains -t 100 -timeout 30 -ssl -c ~/src/github.com/haccer/subjack/fingerprints.json -v 3 >> takeover.txt ;
+		subjack -w ./$domain/all.txt -t 100 -timeout 30 -ssl -c ~/src/github.com/haccer/subjack/fingerprints.json -v 3 >> ./$domain/takeover.txt ;
 	}
+
+
 
 masreport(){
 	echo "<h1 color=red> Report by AxRec " >> $domain/report.html;
-echo "<a href='/' > gett dir </a>" >> $domain/report.html;
-echo "<br> <a href="smuggler/">smugler payload </a> " >> $domain/report.html;
-echo "<a href="witness/ss.html" color="green"> Screenshots </a> <br>" > ./$domain/report.html
-echo "<iframe href='/urls.txt' >  Urls </iframe>" > ./$domain/report.html
-echo '<br><h3>payload xss </h3> <br> <a href="/payload/xss"> payload </a> ' > $domain/report.html
-echo '<br><h4> posible takeover</h4> <a href="takeover.txt">takeover.txt</a>' > $domain/report.html
+#echo "<a href='/' > gett dir </a>" >> $domain/report.html;
+#echo "<br> <a href="smuggler/">smugler payload </a> " >> $domain/report.html;
+
+echo "<a href="./$domain/witness/ss.html" hight="600" width="400" color="green">witness Screenshots </a> <br>" >> ./$domain/report.html
+$howmany=$(wc -l $domain/all.txt);
+echo "<br><h4 color"green">"$howmany" domains in all.txt </h4><a href="$domain/all.txt"></a><br>" >> ./$domain/report.html
+echo "<br><h4 color="red">open ports </h4><a href="$domain/ports.html"></a><br>"  >> ./$domain/report.html
+echo "<h4 color="yellow" > all wayback data </h4> <iframe href='$domain/urls.txt' >  Urls </iframe>" >> ./$domain/report.html
+#echo '<br><h3>payload xss </h3> <br> <a href="/payload/xss"> payload </a> ' >> $domain/report.html
+echo '<br><h4> posible takeover</h4> <a href="./$domain/takeover.txt">takeover.txt</a>' >> $domain/report.html
+echo "<br><h4>ParamSpider</h4><a href="$domain/params.txt"></a><br>" >> ./$domain/report.html
+echo "<br><h4>favfreak data</h4><a href="$domain/favfreak/all-res.txt"></a><br> " >> ./$domain/report.html
+echo "<br><h4>gf data</h4><a href="$domain/gf-data/"></a><br>" >> ./$domain/report.html
+#echo "<br><h4></h4><a href=""></a><br>"
+
 }
 
 getsubs $domain ;
 alive $domain;
-#megdata $domain;
+megdata $domain;
 waybackdata $domain;
 waybackdata2 $domain;
-
 nmapdata $domain;
 #smuggler $domain;
 eye;
-dalfox;
+favfreak;
+#dalfox;
+takeover;
+gfres ;
 witness;
-masreport;
+masreport $domain;
